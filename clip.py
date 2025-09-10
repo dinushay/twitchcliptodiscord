@@ -64,7 +64,6 @@ def get_last_clip():
         "Client-Id": CLIENT_ID
     }
 
-    # Dynamically calculate started_at based on CHECK_INTERVAL
     started_at = (datetime.now(timezone.utc) - timedelta(seconds=CHECK_INTERVAL + 3)).strftime("%Y-%m-%dT%H:%M:%SZ")
 
     url = (
@@ -76,7 +75,7 @@ def get_last_clip():
 
     resp = requests.get(url, headers=headers)
 
-    if resp.status_code == 401:  # token expired
+    if resp.status_code == 401:
         print("[INFO] Token expired. Refreshing...")
         get_access_token()
         return get_last_clip()
@@ -89,7 +88,7 @@ def get_last_clip():
     if not data:
         return None
 
-    return data[0]  # most recent clip
+    return data[0]
 
 
 def read_last_saved_clip():
