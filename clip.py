@@ -40,7 +40,7 @@ def get_access_token():
     Refresh the Twitch access token using the refresh token.
     """
     global ACCESS_TOKEN
-    url = "https://id.twitch.tv/oauth2/token"  # hardcoded token URL
+    url = "https://id.twitch.tv/oauth2/token"
     payload = {
         "client_id": CLIENT_ID,
         "grant_type": "refresh_token",
@@ -57,14 +57,14 @@ def get_access_token():
 
 def get_last_clip():
     """
-    Fetch the most recent clip created in the last 24 hours.
+    Fetch the most recent clip created in the last interval.
     """
     headers = {
         "Authorization": f"Bearer {ACCESS_TOKEN}",
         "Client-Id": CLIENT_ID
     }
 
-    started_at = (datetime.now(timezone.utc) - timedelta(hours=24)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    started_at = (datetime.now(timezone.utc) - timedelta(seconds=CHECK_INTERVAL + 3)).strftime("%Y-%m-%dT%H:%M:%SZ")
 
     url = (
         f"https://api.twitch.tv/helix/clips"
@@ -75,7 +75,7 @@ def get_last_clip():
 
     resp = requests.get(url, headers=headers)
 
-    if resp.status_code == 401:  # token expired
+    if resp.status_code == 401:
         print("[INFO] Token expired. Refreshing...")
         get_access_token()
         return get_last_clip()
@@ -88,7 +88,7 @@ def get_last_clip():
     if not data:
         return None
 
-    return data[0]  # most recent clip
+    return data[0]
 
 
 def read_last_saved_clip():
