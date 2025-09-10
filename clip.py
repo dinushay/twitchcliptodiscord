@@ -40,7 +40,7 @@ def get_access_token():
     Refresh the Twitch access token using the refresh token.
     """
     global ACCESS_TOKEN
-    url = "https://id.twitch.tv/oauth2/token"  # hardcoded token URL
+    url = "https://id.twitch.tv/oauth2/token"
     payload = {
         "client_id": CLIENT_ID,
         "grant_type": "refresh_token",
@@ -57,14 +57,15 @@ def get_access_token():
 
 def get_last_clip():
     """
-    Fetch the most recent clip created in the last 24 hours.
+    Fetch the most recent clip created in the last interval.
     """
     headers = {
         "Authorization": f"Bearer {ACCESS_TOKEN}",
         "Client-Id": CLIENT_ID
     }
 
-    started_at = (datetime.now(timezone.utc) - timedelta(hours=24)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    # Dynamically calculate started_at based on CHECK_INTERVAL
+    started_at = (datetime.now(timezone.utc) - timedelta(seconds=CHECK_INTERVAL + 3)).strftime("%Y-%m-%dT%H:%M:%SZ")
 
     url = (
         f"https://api.twitch.tv/helix/clips"
