@@ -31,7 +31,6 @@ MESSAGE_TEMPLATE = "🎬 New clip created by: [{creator_name}]({url})"
 # Code
 # =============================
 
-# Store last clip id in memory only
 _last_clip_id = None
 
 def get_access_token():
