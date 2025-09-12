@@ -27,13 +27,12 @@ CHECK_INTERVAL = 60
 # Available placeholders: {creator_name}, {url}, {title}, {broadcaster_name}, {id}
 MESSAGE_TEMPLATE = "🎬 New clip created by: [{creator_name}]({url})"
 
-# File to store the last seen clip ID
-LAST_CLIP_FILE = "lastclip.txt"
-
-
 # =============================
 # Code
 # =============================
+
+# Store last clip id in memory only
+_last_clip_id = None
 
 def get_access_token():
     """
@@ -92,15 +91,13 @@ def get_last_clip():
 
 
 def read_last_saved_clip():
-    if not os.path.exists(LAST_CLIP_FILE):
-        return None
-    with open(LAST_CLIP_FILE, "r") as f:
-        return f.read().strip()
+    global _last_clip_id
+    return _last_clip_id
 
 
 def save_last_clip(clip_id):
-    with open(LAST_CLIP_FILE, "w") as f:
-        f.write(clip_id)
+    global _last_clip_id
+    _last_clip_id = clip_id
 
 
 def send_discord_message(clip):
