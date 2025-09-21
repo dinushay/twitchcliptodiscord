@@ -86,8 +86,8 @@ def get_last_clip():
 
         if resp.status_code == 401:
             print("[INFO] Token expired. Refreshing...")
-            get_access_token()
-            return get_last_clip() # Retry after refreshing
+            if get_access_token():
+                return get_last_clip() # Retry after refreshing
 
         if resp.status_code != 200:
             print(f"[ERROR] API error. Status: {resp.status_code}, Response: {resp.text}")
