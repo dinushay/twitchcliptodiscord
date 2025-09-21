@@ -87,7 +87,7 @@ def get_last_clip():
         if resp.status_code == 401:
             print("[INFO] Token expired. Refreshing...")
             if get_access_token():
-                return get_last_clip() # Retry after refreshing
+                return get_last_clip()
 
         if resp.status_code != 200:
             print(f"[ERROR] API error. Status: {resp.status_code}, Response: {resp.text}")
@@ -153,9 +153,8 @@ def main():
             if clip["id"] != last_saved:
                 print(f"[NEW] New clip found: {clip['id']}")
                 if send_discord_message(clip):
-                    save_last_clip(clip["id"]) # Save only after a successful send
+                    save_last_clip(clip["id"])
             else:
-                # This state is less likely with the new time window logic, but kept for safety.
                 print("[INFO] Clip already seen, no new clip.")
         else:
             print("[INFO] No new clips found in the last interval.")
