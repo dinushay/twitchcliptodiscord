@@ -82,7 +82,7 @@ def get_last_clip():
     )
     
     try:
-        resp = requests.get(url, headers=headers)
+        resp = requests.get(url, headers=headers, timeout=10)
 
         if resp.status_code == 401:
             print("[INFO] Token expired. Refreshing...")
