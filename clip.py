@@ -132,13 +132,16 @@ def send_discord_message(clip):
     message = {"content": message_text}
     
     try:
-        resp = requests.post(WEBHOOK_URL, json=message)
+        resp = requests.post(WEBHOOK_URL, json=message, timeout=10)
         if resp.status_code == 204:
             print("[INFO] Message sent to Discord.")
+            return True
         else:
             print(f"[ERROR] Discord webhook error. Status: {resp.status_code}, Response: {resp.text}")
+            return False
     except requests.exceptions.RequestException as e:
         print(f"[ERROR] Network error while sending to Discord: {e}")
+        return False
 
 
 def main():
