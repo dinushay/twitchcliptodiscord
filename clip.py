@@ -152,8 +152,8 @@ def main():
             last_saved = read_last_saved_clip()
             if clip["id"] != last_saved:
                 print(f"[NEW] New clip found: {clip['id']}")
-                send_discord_message(clip)
-                save_last_clip(clip["id"]) # Save only after attempting to send
+                if send_discord_message(clip):
+                    save_last_clip(clip["id"]) # Save only after a successful send
             else:
                 # This state is less likely with the new time window logic, but kept for safety.
                 print("[INFO] Clip already seen, no new clip.")
