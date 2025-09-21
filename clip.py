@@ -21,7 +21,7 @@ WEBHOOK_URL = "<your_discord_webhook_url>"
 BROADCASTER_ID = "<twitch_broadcaster_id>"
 
 # Interval in SECONDS
-CHECK_INTERVAL = 60  
+CHECK_INTERVAL = 60
 
 # Message template (customizable)
 # Available placeholders: {creator_name}, {url}, {title}, {broadcaster_name}, {id}
@@ -38,6 +38,7 @@ LAST_CLIP_FILE = "lastclip.txt"
 def get_access_token():
     """
     Refresh the Twitch access token using the refresh token.
+    Handles potential network errors.
     """
     global ACCESS_TOKEN
     url = "https://id.twitch.tv/oauth2/token"
@@ -46,25 +47,29 @@ def get_access_token():
         "grant_type": "refresh_token",
         "refresh_token": REFRESH_TOKEN
     }
-    resp = requests.post(url, data=payload)
-    if resp.status_code == 200:
-        data = resp.json()
-        ACCESS_TOKEN = data["access_token"]
-        print("[INFO] Access token refreshed.")
-    else:
-        print("[ERROR] Could not refresh access token:", resp.text)
+    try:
+        resp = requests.post(url, data=payload)
+        if resp.status_code == 200:
+            data = resp.json()
+            ACCESS_TOKEN = data["access_token"]
+            print("[INFO] Access token refreshed.")
+        else:
+            print(f"[ERROR] Could not refresh access token. Status: {resp.status_code}, Response: {resp.text}")
+    except requests.exceptions.RequestException as e:
+        print(f"[ERROR] Network error while refreshing token: {e}")
 
 
 def get_last_clip():
     """
     Fetch the most recent clip created in the last interval.
+    Handles potential network errors.
     """
     headers = {
         "Authorization": f"Bearer {ACCESS_TOKEN}",
         "Client-Id": CLIENT_ID
     }
 
-    started_at = (datetime.now(timezone.utc) - timedelta(seconds=CHECK_INTERVAL + 3)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    started_at = (datetime.now(timezone.utc) - timedelta(seconds=CHECK_INTERVAL + 5)).strftime("%Y-%m-%dT%H:%M:%SZ")
 
     url = (
         f"https://api.twitch.tv/helix/clips"
@@ -72,23 +77,28 @@ def get_last_clip():
         f"&first=1"
         f"&started_at={started_at}"
     )
+    
+    try:
+        resp = requests.get(url, headers=headers)
 
-    resp = requests.get(url, headers=headers)
+        if resp.status_code == 401:
+            print("[INFO] Token expired. Refreshing...")
+            get_access_token()
+            return get_last_clip() # Retry after refreshing
 
-    if resp.status_code == 401:
-        print("[INFO] Token expired. Refreshing...")
-        get_access_token()
-        return get_last_clip()
+        if resp.status_code != 200:
+            print(f"[ERROR] API error. Status: {resp.status_code}, Response: {resp.text}")
+            return None
 
-    if resp.status_code != 200:
-        print("[ERROR] API error:", resp.text)
+        data = resp.json().get("data", [])
+        if not data:
+            return None
+
+        return data[0]
+
+    except requests.exceptions.RequestException as e:
+        print(f"[ERROR] Network error while fetching clips: {e}")
         return None
-
-    data = resp.json().get("data", [])
-    if not data:
-        return None
-
-    return data[0]
 
 
 def read_last_saved_clip():
@@ -106,6 +116,7 @@ def save_last_clip(clip_id):
 def send_discord_message(clip):
     """
     Send a message to the Discord webhook.
+    Handles potential network errors.
     """
     message_text = MESSAGE_TEMPLATE.format(
         creator_name=clip.get("creator_name", "Unknown"),
@@ -116,11 +127,15 @@ def send_discord_message(clip):
     )
 
     message = {"content": message_text}
-    resp = requests.post(WEBHOOK_URL, json=message)
-    if resp.status_code == 204:
-        print("[INFO] Message sent to Discord.")
-    else:
-        print("[ERROR] Discord webhook error:", resp.text)
+    
+    try:
+        resp = requests.post(WEBHOOK_URL, json=message)
+        if resp.status_code == 204:
+            print("[INFO] Message sent to Discord.")
+        else:
+            print(f"[ERROR] Discord webhook error. Status: {resp.status_code}, Response: {resp.text}")
+    except requests.exceptions.RequestException as e:
+        print(f"[ERROR] Network error while sending to Discord: {e}")
 
 
 def main():
@@ -131,12 +146,13 @@ def main():
             last_saved = read_last_saved_clip()
             if clip["id"] != last_saved:
                 print(f"[NEW] New clip found: {clip['id']}")
-                save_last_clip(clip["id"])
                 send_discord_message(clip)
+                save_last_clip(clip["id"]) # Save only after attempting to send
             else:
-                print("[INFO] No new clip.")
+                # This state is less likely with the new time window logic, but kept for safety.
+                print("[INFO] Clip already seen, no new clip.")
         else:
-            print("[INFO] No clips found.")
+            print("[INFO] No new clips found in the last interval.")
         time.sleep(CHECK_INTERVAL)
 
 
