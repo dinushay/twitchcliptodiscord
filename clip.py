@@ -48,15 +48,18 @@ def get_access_token():
         "refresh_token": REFRESH_TOKEN
     }
     try:
-        resp = requests.post(url, data=payload)
+        resp = requests.post(url, data=payload, timeout=10)
         if resp.status_code == 200:
             data = resp.json()
             ACCESS_TOKEN = data["access_token"]
             print("[INFO] Access token refreshed.")
+            return True
         else:
             print(f"[ERROR] Could not refresh access token. Status: {resp.status_code}, Response: {resp.text}")
+            return False
     except requests.exceptions.RequestException as e:
         print(f"[ERROR] Network error while refreshing token: {e}")
+        return False
 
 
 def get_last_clip():
