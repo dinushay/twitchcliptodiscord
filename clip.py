@@ -1,6 +1,7 @@
 import requests
 import time
 import os
+import sys
 from datetime import datetime, timedelta, timezone
 
 # =============================
@@ -16,9 +17,9 @@ REFRESH_TOKEN = "<your_refresh_token>"
 # Your Discord Webhook URL (create one in your Discord server settings)
 WEBHOOK_URL = "<your_discord_webhook_url>"
 
-# The Twitch broadcaster you want to monitor
-# https://streamweasels.com/tools/convert-twitch-username-to-user-id
-BROADCASTER_ID = "<twitch_broadcaster_id>"
+# The Twitch broadcaster you want to monitor (can be a username OR user ID)
+# e.g., "shroud" or "56789012"
+BROADCASTER_IDENTIFIER = "<twitch_username_or_id>"
 
 # Interval in SECONDS
 CHECK_INTERVAL = 60
@@ -62,9 +63,41 @@ def get_access_token():
         return False
 
 
-def get_last_clip():
+def get_user_id(username):
     """
-    Fetch the most recent clip created in the last interval.
+    Converts a Twitch username to a user ID.
+    """
+    headers = {
+        "Authorization": f"Bearer {ACCESS_TOKEN}",
+        "Client-Id": CLIENT_ID
+    }
+    url = f"https://api.twitch.tv/helix/users?login={username}"
+    try:
+        resp = requests.get(url, headers=headers, timeout=10)
+
+        if resp.status_code == 401:
+            print("[INFO] Token expired while getting user ID. Refreshing...")
+            if get_access_token():
+                return get_user_id(username)
+
+        if resp.status_code != 200:
+            print(f"[ERROR] API error getting user ID. Status: {resp.status_code}, Response: {resp.text}")
+            return None
+
+        data = resp.json().get("data", [])
+        if not data:
+            print(f"[ERROR] No user found with username: {username}")
+            return None
+
+        return data[0]["id"]
+    except requests.exceptions.RequestException as e:
+        print(f"[ERROR] Network error while fetching user ID: {e}")
+        return None
+
+
+def get_last_clip(broadcaster_id):
+    """
+    Fetch the most recent clip for a given broadcaster_id.
     Handles potential network errors.
     """
     headers = {
@@ -76,7 +109,7 @@ def get_last_clip():
 
     url = (
         f"https://api.twitch.tv/helix/clips"
-        f"?broadcaster_id={BROADCASTER_ID}"
+        f"?broadcaster_id={broadcaster_id}"
         f"&first=1"
         f"&started_at={started_at}"
     )
@@ -85,12 +118,12 @@ def get_last_clip():
         resp = requests.get(url, headers=headers, timeout=10)
 
         if resp.status_code == 401:
-            print("[INFO] Token expired. Refreshing...")
+            print("[INFO] Token expired while fetching clips. Refreshing...")
             if get_access_token():
-                return get_last_clip()
+                return get_last_clip(broadcaster_id)
 
         if resp.status_code != 200:
-            print(f"[ERROR] API error. Status: {resp.status_code}, Response: {resp.text}")
+            print(f"[ERROR] API error fetching clips. Status: {resp.status_code}, Response: {resp.text}")
             return None
 
         data = resp.json().get("data", [])
@@ -146,8 +179,22 @@ def send_discord_message(clip):
 
 def main():
     print("[INFO] Starting Twitch clip monitor...")
+    resolved_broadcaster_id = None
+    if BROADCASTER_IDENTIFIER.isdigit():
+        print(f"[INFO] Broadcaster identifier '{BROADCASTER_IDENTIFIER}' is a numeric ID.")
+        resolved_broadcaster_id = BROADCASTER_IDENTIFIER
+    else:
+        print(f"[INFO] Broadcaster identifier '{BROADCASTER_IDENTIFIER}' is a username, attempting to convert to ID...")
+        resolved_broadcaster_id = get_user_id(BROADCASTER_IDENTIFIER)
+    
+    if not resolved_broadcaster_id:
+        print("[FATAL] Could not resolve broadcaster identifier to a valid user ID. Please check the username/ID and your credentials. Exiting.")
+        sys.exit(1)
+    
+    print(f"[INFO] Successfully resolved to Broadcaster ID: {resolved_broadcaster_id}. Monitoring for clips...")
+
     while True:
-        clip = get_last_clip()
+        clip = get_last_clip(resolved_broadcaster_id)
         if clip:
             last_saved = read_last_saved_clip()
             if clip["id"] != last_saved:
